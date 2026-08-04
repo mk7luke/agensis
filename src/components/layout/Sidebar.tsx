@@ -624,6 +624,16 @@ export const Sidebar = React.memo(function Sidebar({
      onChange={handleUploadInputChange}
      aria-label="Upload files"
     />
+    {/* Same drag band as the rail's — collapsed, this column also reserves
+        titlebarInset at the top, and under `hiddenInset` reserved space that is
+        not a drag region leaves the window immovable. */}
+    {titlebarInset ? (
+     <div
+      aria-hidden="true"
+      className="absolute inset-x-0 top-0"
+      style={{ height: titlebarInset, WebkitAppRegion: 'drag' } as React.CSSProperties}
+     />
+    ) : null}
     {/* Theme-accent wash on the chrome — see .sidebar-accent-wash in index.css.
         Decorative, non-interactive, and out of flow, so it is not a flex item. */}
     <div aria-hidden="true" className="sidebar-accent-wash" />

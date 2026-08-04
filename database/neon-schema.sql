@@ -1529,6 +1529,17 @@ CREATE TABLE IF NOT EXISTS channel_bridges (
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
+-- A database created before the Nostr community bridge has the table already,
+-- so CREATE TABLE IF NOT EXISTS above is a no-op there and the nostr columns
+-- (and the widened provider check) have to be added in place — otherwise the
+-- indexes below reference a column that does not exist and boot dies here.
+ALTER TABLE channel_bridges DROP CONSTRAINT IF EXISTS channel_bridges_provider_check;
+ALTER TABLE channel_bridges ADD CONSTRAINT channel_bridges_provider_check
+  CHECK (provider IN ('telegram', 'slack', 'whatsapp', 'signal', 'openclaw', 'nostr'));
+ALTER TABLE channel_bridges ADD COLUMN IF NOT EXISTS nostr_connection_id uuid
+  REFERENCES nostr_community_connections(id) ON DELETE CASCADE;
+ALTER TABLE channel_bridges ADD COLUMN IF NOT EXISTS nostr_last_event_at bigint NOT NULL DEFAULT 0;
+ALTER TABLE channel_bridges ADD COLUMN IF NOT EXISTS nostr_initial_sync_completed boolean NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS idx_channel_bridges_workspace_id ON channel_bridges(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_channel_bridges_session_id ON channel_bridges(session_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_channel_bridges_session ON channel_bridges(session_id);
@@ -1770,6 +1781,14 @@ CREATE TABLE IF NOT EXISTS session_read_state (
   CONSTRAINT session_read_state_marker_id_key UNIQUE (marker_id),
   CONSTRAINT session_read_state_one_reader CHECK ((user_id IS NOT NULL) <> (agent_id IS NOT NULL))
 );
+-- Pre-thread databases have session_read_state without thread_parent_id, so the
+-- CREATE TABLE above is a no-op there and the scope indexes below have nothing
+-- to index. Only the column the indexes need is added here; the rest of the
+-- upgrade (marker_id, event_version, last_seen_message_id, dropping the old
+-- (session_id, user_id) PK) is single-sourced in shared/read-receipts.cjs and
+-- runs from ensureRuntimeSchema on boot.
+ALTER TABLE session_read_state ADD COLUMN IF NOT EXISTS thread_parent_id uuid
+  REFERENCES messages(id) ON DELETE CASCADE;
 CREATE UNIQUE INDEX IF NOT EXISTS session_read_state_user_scope_uidx
   ON session_read_state (session_id, user_id, thread_parent_id) NULLS NOT DISTINCT
   WHERE user_id IS NOT NULL;
@@ -1892,6 +1911,11 @@ CREATE TABLE IF NOT EXISTS agent_schedule_runs (
   created_at timestamptz DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_agent_schedule_runs_schedule ON agent_schedule_runs(schedule_id, created_at desc);
+-- Older databases have agent_schedule_runs without session_id. The backfill and
+-- the NOT NULL that follow it live in ensureRuntimeSchema (server/index.cjs);
+-- this only has to make the column exist so the index below can be built.
+ALTER TABLE agent_schedule_runs ADD COLUMN IF NOT EXISTS session_id uuid
+  REFERENCES chat_sessions(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_agent_schedule_runs_session ON agent_schedule_runs(session_id, created_at desc);
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agent_schedules_interval_bounds') THEN
