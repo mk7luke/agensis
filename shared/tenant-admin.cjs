@@ -43,6 +43,9 @@ const { summarizeUsage, RATES_AS_OF } = require('./usage-rates.cjs');
 /** The env var naming the one account allowed to read this surface. */
 const SYSTEM_OWNER_EMAIL_ENV = 'AGENSIS_SYSTEM_OWNER_EMAIL';
 
+/** The env var that closes public sign-up. See isSignupDisabled. */
+const DISABLE_SIGNUP_ENV = 'AGENSIS_DISABLE_SIGNUP';
+
 /**
  * How many accounts one list request may return. The surface is an operator's
  * list, not a paginated report; the cap exists so a deployment that grows to
@@ -124,6 +127,35 @@ function configuredSystemOwnerEmail(env = process.env) {
 function isReservedSignupEmail(email, env = process.env) {
  return isSystemOwnerEmail(email, env?.[SYSTEM_OWNER_EMAIL_ENV]);
 }
+
+/**
+ * PURE: must the account-creation doors refuse EVERY new account?
+ *
+ * A self-hosted deployment reachable from the internet has no way to say "the
+ * people who need accounts have them". Every door creates one for anyone who
+ * can reach it, so the only controls available were an edge rule in front of
+ * the deployment — which lives outside the repo and disappears silently when
+ * that infrastructure is rebuilt — or nothing.
+ *
+ * Set AGENSIS_DISABLE_SIGNUP and all three doors refuse: password signup on
+ * both backends, and the OAuth door that also creates on first social login.
+ * It gates CREATION only. Sign-in is untouched and every existing account,
+ * including the owner's, works exactly as before — so switching it on cannot
+ * lock anybody out. Unset (the default) behaves exactly as it did before this
+ * existed, which is what keeps the hosted deployment unaffected.
+ *
+ * Unlike the owner-address reservation above, this one does NOT hide behind a
+ * duplicate-account response. Reserving one address has to stay unprobeable;
+ * "this deployment is not accepting sign-ups" is a fact its operator wants a
+ * would-be user to read, and telling them costs nothing an attacker could use.
+ */
+function isSignupDisabled(env = process.env) {
+ const raw = String(env?.[DISABLE_SIGNUP_ENV] ?? '').trim().toLowerCase();
+ return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
+}
+
+/** The refusal every door returns, so the three cannot drift apart. */
+const SIGNUP_DISABLED_MESSAGE = 'Sign-up is closed on this deployment. Ask its operator for an account.';
 
 /**
  * Resolve whether the AUTHENTICATED user is the system owner.
@@ -765,6 +797,8 @@ module.exports = {
  isSystemOwnerEmail,
  configuredSystemOwnerEmail,
  isReservedSignupEmail,
+ isSignupDisabled,
+ SIGNUP_DISABLED_MESSAGE,
  isSystemOwnerUser,
  assertSystemOwner,
  tenantUserColumns,

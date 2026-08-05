@@ -60,7 +60,34 @@ first-time self-hoster needs.
 | `AGENSIS_AUTH_SECRET` | *(empty)* | Signs session tokens. Empty is correct for one instance — the server mints a secret on first boot and stores it in `app_settings`. Set it (`openssl rand -hex 32`) to run more than one app container against one database. Changing it signs everyone out. |
 | `ANTHROPIC_API_KEY` | *(empty)* | Enables AI chat. Also settable in-app. |
 | `AGENSIS_APP_URL` | *(empty)* | Public origin for invite and join links. Defaults to the request's own host. |
+| `AGENSIS_DISABLE_SIGNUP` | *(empty)* | Set to `1` to close public sign-up — see below. |
+| `AGENSIS_SYSTEM_OWNER_EMAIL` | *(empty)* | The account that owns the Tenants admin surface. Also reserves that address at sign-up. |
 | `VITE_BACKEND_BASE_URL` | *(empty)* | Only needed for HTTPS on a non-localhost hostname — see below. Baked into the bundle, so `docker compose build` after changing it. |
+
+## Closing sign-up
+
+Sign-up is **open by default**, and that is the right default for a first run —
+the first thing you do is create your own account, and there is no seeded user
+to do it for you. It is the wrong default the moment the deployment is reachable
+from the internet: anyone who can load the page can create an account.
+
+```bash
+AGENSIS_DISABLE_SIGNUP=1
+docker compose up -d
+```
+
+No rebuild — it is read by the server at request time, not baked into the
+bundle. Every account-creation door refuses: password sign-up and, on the
+Netlify lane, the social login that creates an account on first use.
+
+This gates creation only. Sign-in still works and every existing account is
+untouched, so switching it on cannot lock you out. To add somebody later,
+comment it out, `docker compose up -d`, let them sign up, and put it back.
+
+A stranger who signs up on an open deployment does not gain access to your
+data — workspace membership is what grants that, and a new account has none.
+What they gain is an account on your machine and whatever it can consume, which
+is reason enough to close the door.
 
 ## Serving over HTTPS on your own hostname
 

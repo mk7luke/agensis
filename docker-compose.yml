@@ -47,6 +47,13 @@ services:
       # Optional. Can also be set later in the app under Settings → Secret keys.
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       AGENSIS_APP_URL: ${AGENSIS_APP_URL:-}
+      # The address that owns the tenant-admin surface. Setting it also RESERVES
+      # that address at signup, so a stranger cannot register it and inherit the
+      # authority — see shared/tenant-admin.cjs. Unset reserves nothing.
+      AGENSIS_SYSTEM_OWNER_EMAIL: ${AGENSIS_SYSTEM_OWNER_EMAIL:-}
+      # Set to 1 to refuse every new account. Sign-in and existing accounts are
+      # unaffected, so it cannot lock you out. See docs/DOCKER.md.
+      AGENSIS_DISABLE_SIGNUP: ${AGENSIS_DISABLE_SIGNUP:-}
     ports:
       - "${APP_PORT:-3142}:3142"
     volumes:

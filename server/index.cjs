@@ -296,6 +296,8 @@ const {
 const {
  assertSystemOwner,
  isReservedSignupEmail,
+ isSignupDisabled,
+ SIGNUP_DISABLED_MESSAGE,
  listTenantAccounts,
  getTenantAccount,
 } = require('../shared/tenant-admin.cjs');
@@ -9594,7 +9596,8 @@ function createApp() {
  mountAuthRoutes(app, {
   ...coreDeps(),
   createPasswordHash, emailLookupRateLimiter, evaluatePasswordServerSide,
- isReservedSignupEmail, issueToken, setCachedTokenVersion,
+ isReservedSignupEmail, isSignupDisabled, SIGNUP_DISABLED_MESSAGE,
+  issueToken, setCachedTokenVersion,
   revokeRealtimeAccessForMember,
   notifyReadReceiptPreference,
   signinIpFailureLimiter, signinRateLimiter, signupRateLimiter, verifyPassword,

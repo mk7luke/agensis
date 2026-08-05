@@ -25,7 +25,8 @@ function mountAuthRoutes(app, deps = {}) {
  const {
   requireAuth, jsonError, enforceWorkspaceRole, getDb, rateLimitBlocked,
   clientIpFromReq, createPasswordHash, emailLookupRateLimiter,
-  evaluatePasswordServerSide, isReservedSignupEmail, issueToken,
+  evaluatePasswordServerSide, isReservedSignupEmail, isSignupDisabled,
+  SIGNUP_DISABLED_MESSAGE, issueToken,
   notifyDbSubscribers, revokeRealtimeAccessForMember = async () => {},
   notifyReadReceiptPreference = () => {},
   setCachedTokenVersion, signinIpFailureLimiter, signinRateLimiter,
@@ -35,6 +36,9 @@ function mountAuthRoutes(app, deps = {}) {
  app.post('/backend/auth/signup', async (req, res) => {
   try {
    if (rateLimitBlocked(res, signupRateLimiter, clientIpFromReq(req))) return;
+   // Before the body is even read: a deployment that is not accepting accounts
+   // is not accepting this one either, whatever it says.
+   if (isSignupDisabled()) return jsonError(res, 403, new Error(SIGNUP_DISABLED_MESSAGE));
    const email = String(req.body?.email || '').trim().toLowerCase();
    const password = String(req.body?.password || '');
    if (!email || !password) return jsonError(res, 400, new Error('Email and password are required'));

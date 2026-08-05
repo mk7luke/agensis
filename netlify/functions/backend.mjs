@@ -77,6 +77,8 @@ import {
 import {
  assertSystemOwner,
  isReservedSignupEmail,
+ isSignupDisabled,
+ SIGNUP_DISABLED_MESSAGE,
  listTenantAccounts,
  getTenantAccount,
 } from '../../shared/tenant-admin.cjs';
@@ -1872,6 +1874,10 @@ async function handleAuth(pathname, req) {
   const signupBlocked = rateLimitBlock(signupRateLimiter, clientIpFromRequest(req));
   if (signupBlocked) return signupBlocked;
 
+  // Same gate as the server lane's, from the same predicate — the two backends
+  // share one database, so a door either of them leaves open is open.
+  if (isSignupDisabled()) return jsonError(403, new Error(SIGNUP_DISABLED_MESSAGE));
+
   const policy = evaluatePasswordServerSide(password);
   if (!policy.valid) return jsonError(400, new Error(policy.message || 'Password must be at least 10 characters and include 3 of: lowercase, uppercase, number, symbol.'));
 
@@ -1930,6 +1936,12 @@ async function handleOAuthAuth() {
  // through OAuth exactly as before.
  if (!existing[0] && isReservedSignupEmail(email)) {
   return jsonError(409, new Error('An account with that email already exists'));
+ }
+ // Creation only, exactly like the reservation above it: a social login that
+ // would MAKE an account is a sign-up, and is refused with the rest of them.
+ // Someone who already has an account keeps signing in through this door.
+ if (!existing[0] && isSignupDisabled()) {
+  return jsonError(403, new Error(SIGNUP_DISABLED_MESSAGE));
  }
  const row = existing[0] || (await query(
   'insert into app_users (email, password_hash) values ($1, $2) returning id, email, display_name, accent_color, created_at, token_version',

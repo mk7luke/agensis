@@ -11,7 +11,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { assertSystemOwner, isSystemOwnerUser, isSystemOwnerEmail, isReservedSignupEmail } = require('../shared/tenant-admin.cjs');
+const {
+  assertSystemOwner, isSystemOwnerUser, isSystemOwnerEmail, isReservedSignupEmail,
+  isSignupDisabled, SIGNUP_DISABLED_MESSAGE,
+} = require('../shared/tenant-admin.cjs');
 
 const OWNER = 'jason@bouncingfish.com';
 const OWNER_ID = 'owner-1';
@@ -100,4 +103,34 @@ test('with NO owner configured, isReservedSignupEmail reserves nothing (fail-saf
   assert.equal(isReservedSignupEmail(OWNER, {}), false);
   assert.equal(isReservedSignupEmail(OWNER, { AGENSIS_SYSTEM_OWNER_EMAIL: '' }), false);
   assert.equal(isReservedSignupEmail(OWNER, { AGENSIS_SYSTEM_OWNER_EMAIL: '   ' }), false);
+});
+
+// AGENSIS_DISABLE_SIGNUP closes every account-creation door on a deployment that
+// has the accounts it needs. The default has to stay OPEN — a first run has no
+// seeded user and no other way to make one — so the risk here is the switch
+// reading as "on" when nobody set it, which would lock a fresh deployment out
+// of its own first account.
+test('isSignupDisabled is off unless the deployment actually asked for it', () => {
+  assert.equal(isSignupDisabled({}), false);
+  assert.equal(isSignupDisabled({ AGENSIS_DISABLE_SIGNUP: '' }), false);
+  assert.equal(isSignupDisabled({ AGENSIS_DISABLE_SIGNUP: '   ' }), false);
+  assert.equal(isSignupDisabled({ AGENSIS_DISABLE_SIGNUP: '0' }), false);
+  assert.equal(isSignupDisabled({ AGENSIS_DISABLE_SIGNUP: 'false' }), false);
+  // Not a truthy-string reading: an operator who wrote something ambiguous gets
+  // the open default and a door that still works, not a silent lockout.
+  assert.equal(isSignupDisabled({ AGENSIS_DISABLE_SIGNUP: 'no' }), false);
+});
+
+test('isSignupDisabled accepts the spellings an operator actually writes', () => {
+  for (const raw of ['1', 'true', 'TRUE', ' yes ', 'On']) {
+    assert.equal(isSignupDisabled({ AGENSIS_DISABLE_SIGNUP: raw }), true, `expected ${JSON.stringify(raw)} to close signup`);
+  }
+});
+
+test('the refusal names the deployment, not the address', () => {
+  // The owner-address reservation deliberately hides behind a duplicate-account
+  // 409 so it cannot be probed. This one is the opposite: a would-be user must
+  // be able to read why, and there is nothing to leak.
+  assert.match(SIGNUP_DISABLED_MESSAGE, /sign-up is closed/i);
+  assert.doesNotMatch(SIGNUP_DISABLED_MESSAGE, /already exists/i);
 });
